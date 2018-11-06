@@ -8,10 +8,12 @@ Empty project structure for ESP8266 app based on NON-OS SDK.
 
 ## Building the binaries 
 Basic:
+
 	# well this is easy ...
 	make
 
-While for building both APP1 and APP2 and make them available for FOTA
+While for building both APP1 and APP2 and make them available for FOTA:
+
 	# this is boring ...
 	export APP=1
 	make clean
