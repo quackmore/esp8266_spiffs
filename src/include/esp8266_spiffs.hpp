@@ -32,6 +32,13 @@ extern "C"
 #error "The flash map is not supported"
 #endif
 
+#define FS_START SYSTEM_PARTITION_DATA
+#define FS_END SYSTEM_PARTITION_RF_CAL_ADDR
+#define FS_ALIGN_BYTES 4
+#define SPIFFS_FLASH_RESULT_ERR -10200
+#define SPIFFS_FLASH_RESULT_TIMEOUT -10201
+#define SPIFFS_FLASH_BOUNDARY_ERROR -10202
+
 // debug macros
 #define P_FATAL(...) os_printf(__VA_ARGS__)
 #define P_ERROR(...) os_printf(__VA_ARGS__)

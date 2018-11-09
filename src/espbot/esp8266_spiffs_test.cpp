@@ -22,7 +22,7 @@ class flafs_test : public flafs
 
 void ICACHE_FLASH_ATTR flafs_test::test(void)
 {
-    // SYSTEM_PARTITION_DATA
+    // FS_START
     // SYSTEM_PARTITION_RF_CAL_ADDR
     P_INFO("[INFO]: TEST\n");
     P_INFO("[INFO]: TEST\n");
@@ -38,11 +38,11 @@ void ICACHE_FLASH_ATTR flafs_test::test(void)
     // erase first and second available sector
     P_INFO("[INFO]: Preparing for flash memory function test...\n");
     P_TRACE("[TRACE]: erasing first and second available sector\n");
-    res = spiffs_erase(SYSTEM_PARTITION_DATA, (1024 * 5));
+    res = spiffs_erase(FS_START, (1024 * 5));
 
     // read first and second available sector
     P_TRACE("[TRACE]: reading first and second available sector\n");
-    res = spiffs_read(SYSTEM_PARTITION_DATA, 1024 * 4 * 2, two_sect_buffer);
+    res = spiffs_read(FS_START, 1024 * 4 * 2, two_sect_buffer);
 
     // check that they are filled with 0xFF
     {
@@ -62,8 +62,8 @@ void ICACHE_FLASH_ATTR flafs_test::test(void)
         char str[15];
         for (idx = 0; idx < 15; idx++)
             str[idx] = idx;
-        res = spiffs_write(SYSTEM_PARTITION_DATA, 15, (u8_t *)str);
-        res = spiffs_read(SYSTEM_PARTITION_DATA, 1024 * 4 * 2, two_sect_buffer);
+        res = spiffs_write(FS_START, 15, (u8_t *)str);
+        res = spiffs_read(FS_START, 1024 * 4 * 2, two_sect_buffer);
         for (idx = 0; idx < 15; idx++)
             if (two_sect_buffer[idx] != idx)
             {
@@ -88,8 +88,8 @@ void ICACHE_FLASH_ATTR flafs_test::test(void)
         char str[15];
         for (idx = 0; idx < 15; idx++)
             str[idx] = 21 + idx;
-        res = spiffs_write(SYSTEM_PARTITION_DATA + 21, 15, (u8_t *)str);
-        res = spiffs_read(SYSTEM_PARTITION_DATA, 1024 * 4 * 2, two_sect_buffer);
+        res = spiffs_write(FS_START + 21, 15, (u8_t *)str);
+        res = spiffs_read(FS_START, 1024 * 4 * 2, two_sect_buffer);
         for (idx = 0; idx < 15; idx++)
             if (two_sect_buffer[idx] != idx)
             {
@@ -130,8 +130,8 @@ void ICACHE_FLASH_ATTR flafs_test::test(void)
         char str[299];
         for (idx = 0; idx < 299; idx++)
             str[idx] = 0xAA;
-        res = spiffs_write(SYSTEM_PARTITION_DATA + 4051, 299, (u8_t *)str);
-        res = spiffs_read(SYSTEM_PARTITION_DATA, 1024 * 4 * 2, two_sect_buffer);
+        res = spiffs_write(FS_START + 4051, 299, (u8_t *)str);
+        res = spiffs_read(FS_START, 1024 * 4 * 2, two_sect_buffer);
         for (idx = 0; idx < 15; idx++)
             if (two_sect_buffer[idx] != idx)
             {
@@ -186,21 +186,106 @@ void ICACHE_FLASH_ATTR flafs_test::test(void)
     P_INFO("[INFO]: Test 3 successfully completed\n");
     P_INFO("[INFO]: Test 4 - erase first two sectors\n");
     {
-        res = spiffs_erase(SYSTEM_PARTITION_DATA, (1024 * 5));
-        res = spiffs_read(SYSTEM_PARTITION_DATA, 1024 * 4 * 2, two_sect_buffer);
+        res = spiffs_erase(FS_START, (1024 * 5));
+        res = spiffs_read(FS_START, 1024 * 4 * 2, two_sect_buffer);
 
         // check that they are filled with 0xFF
         int idx;
         for (idx = 0; idx < (1024 * 4 * 2); idx++)
             if (two_sect_buffer[idx] != 0xFF)
             {
-                P_ERROR("[ERROR]: flash was not erased!\n");
+                P_ERROR("[ERROR]: Test failed. Flash was not erased!\n");
                 P_INFO("Exiting tests ...");
                 os_free((void *)two_sect_buffer_space);
                 return;
             }
     }
     P_INFO("[INFO]: Test 4 successfully completed\n");
+    P_INFO("[INFO]: Test 5 - boundary checks\n");
+    {
+        res = spiffs_read(FS_START - 1, 1024 * 4 * 2, two_sect_buffer);
+        if (res != SPIFFS_FLASH_BOUNDARY_ERROR)
+        {
+            P_ERROR("[ERROR]: Test failed!\n");
+            P_ERROR("[ERROR]: Reading before flash file system start!\n");
+            P_INFO("Exiting tests ...");
+            os_free((void *)two_sect_buffer_space);
+            return;
+        }
+        res = spiffs_read(FS_END + 1, 1024 * 4 * 2, two_sect_buffer);
+        if (res != SPIFFS_FLASH_BOUNDARY_ERROR)
+        {
+            P_ERROR("[ERROR]: Test failed!\n");
+            P_ERROR("[ERROR]: Reading after flash file system end!\n");
+            P_INFO("Exiting tests ...");
+            os_free((void *)two_sect_buffer_space);
+            return;
+        }
+        res = spiffs_read(FS_END - 4, 8, two_sect_buffer);
+        if (res != SPIFFS_FLASH_BOUNDARY_ERROR)
+        {
+            P_ERROR("[ERROR]: Test failed!\n");
+            P_ERROR("[ERROR]: Reading after flash file system end!\n");
+            P_INFO("Exiting tests ...");
+            os_free((void *)two_sect_buffer_space);
+            return;
+        }
+        res = spiffs_write(FS_START - 1, 1024 * 4 * 2, two_sect_buffer);
+        if (res != SPIFFS_FLASH_BOUNDARY_ERROR)
+        {
+            P_ERROR("[ERROR]: Test failed!\n");
+            P_ERROR("[ERROR]: Writing before flash file system start!\n");
+            P_INFO("Exiting tests ...");
+            os_free((void *)two_sect_buffer_space);
+            return;
+        }
+        res = spiffs_write(FS_END + 1, 1024 * 4 * 2, two_sect_buffer);
+        if (res != SPIFFS_FLASH_BOUNDARY_ERROR)
+        {
+            P_ERROR("[ERROR]: Test failed!\n");
+            P_ERROR("[ERROR]: Writing after flash file system end!\n");
+            P_INFO("Exiting tests ...");
+            os_free((void *)two_sect_buffer_space);
+            return;
+        }
+        res = spiffs_write(FS_END - 4, 8, two_sect_buffer);
+        if (res != SPIFFS_FLASH_BOUNDARY_ERROR)
+        {
+            P_ERROR("[ERROR]: Test failed!\n");
+            P_ERROR("[ERROR]: Writing after flash file system end!\n");
+            P_INFO("Exiting tests ...");
+            os_free((void *)two_sect_buffer_space);
+            return;
+        }
+        res = spiffs_erase(FS_START - 1, 1024 * 4 * 2);
+        if (res != SPIFFS_FLASH_BOUNDARY_ERROR)
+        {
+            P_ERROR("[ERROR]: Test failed!\n");
+            P_ERROR("[ERROR]: Erasing before flash file system start!\n");
+            P_INFO("Exiting tests ...");
+            os_free((void *)two_sect_buffer_space);
+            return;
+        }
+        res = spiffs_erase(FS_END + 1, 1024 * 4 * 2);
+        if (res != SPIFFS_FLASH_BOUNDARY_ERROR)
+        {
+            P_ERROR("[ERROR]: Test failed!\n");
+            P_ERROR("[ERROR]: Erasing after flash file system end!\n");
+            P_INFO("Exiting tests ...");
+            os_free((void *)two_sect_buffer_space);
+            return;
+        }
+        res = spiffs_erase(FS_END - 4, 8);
+        if (res != SPIFFS_FLASH_BOUNDARY_ERROR)
+        {
+            P_ERROR("[ERROR]: Test failed!\n");
+            P_ERROR("[ERROR]: Erasing after flash file system end!\n");
+            P_INFO("Exiting tests ...");
+            os_free((void *)two_sect_buffer_space);
+            return;
+        }
+    }
+    P_INFO("[INFO]: Test 5 successfully completed\n");
     P_INFO("[INFO]: That's all.\n");
     os_free((void *)two_sect_buffer_space);
     P_DEBUG("[DEBUG]: Available heap size: %d\n", system_get_free_heap_size());

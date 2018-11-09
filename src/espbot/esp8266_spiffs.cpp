@@ -20,22 +20,27 @@ extern "C"
 
 #include "esp8266_spiffs.hpp"
 
-#define F_ALIGN_BYTES 4
-#define SPIFFS_FLASH_RESULT_ERR -10200
-#define SPIFFS_FLASH_RESULT_TIMEOUT -10201
-
 s32_t ICACHE_FLASH_ATTR flafs::spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)
 {
     P_TRACE("[TRACE]: spiffs read called --------------------------------------\n");
-    // let's use aligned ram variable
-    // warning: using stack instead of heap will produce hallucinations
-    uint32 buffer_space = (uint32)os_malloc(LOG_PAGE_SIZE + F_ALIGN_BYTES);
-    uint32 *buffer = (uint32 *)(((buffer_space + F_ALIGN_BYTES) / F_ALIGN_BYTES) * F_ALIGN_BYTES);
     SpiFlashOpResult res;
     // find aligned start address
-    u32_t start_addr = (t_addr / F_ALIGN_BYTES) * F_ALIGN_BYTES;
+    u32_t start_addr = (t_addr / FS_ALIGN_BYTES) * FS_ALIGN_BYTES;
     // and how many bytes are required by alignment
-    int align_bytes = t_addr % F_ALIGN_BYTES;
+    int align_bytes = t_addr % FS_ALIGN_BYTES;
+
+    // boundary checks
+    if ((start_addr < FS_START) || (start_addr >= FS_END) ||
+        (start_addr + ((t_size / FS_ALIGN_BYTES) * FS_ALIGN_BYTES) >= FS_END))
+    {
+        P_ERROR("[ERROR]: Flash file system boundary error!\n");
+        return SPIFFS_FLASH_BOUNDARY_ERROR;
+    }
+
+    // let's use aligned ram variables
+    // warning: using stack instead of heap will produce hallucinations
+    uint32 buffer_space = (uint32)os_malloc(LOG_PAGE_SIZE + FS_ALIGN_BYTES);
+    uint32 *buffer = (uint32 *)(((buffer_space + FS_ALIGN_BYTES) / FS_ALIGN_BYTES) * FS_ALIGN_BYTES);
 
     while (t_size > 0)
     {
@@ -86,15 +91,24 @@ s32_t ICACHE_FLASH_ATTR flafs::spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_d
 s32_t ICACHE_FLASH_ATTR flafs::spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src)
 {
     P_TRACE("[TRACE]: spiffs write called -------------------------------------\n");
-    // let's use aligned ram variable
-    // warning: using stack instead of heap will produce hallucinations
-    uint32 buffer_space = (uint32)os_malloc(LOG_PAGE_SIZE + F_ALIGN_BYTES);
-    uint32 *buffer = (uint32 *)(((buffer_space + F_ALIGN_BYTES) / F_ALIGN_BYTES) * F_ALIGN_BYTES);
     SpiFlashOpResult res;
     // find aligned start address
-    u32_t start_addr = (t_addr / F_ALIGN_BYTES) * F_ALIGN_BYTES;
+    u32_t start_addr = (t_addr / FS_ALIGN_BYTES) * FS_ALIGN_BYTES;
     // and how many bytes are required by alignment
-    u8_t align_bytes = t_addr % F_ALIGN_BYTES;
+    u8_t align_bytes = t_addr % FS_ALIGN_BYTES;
+
+    // boundary checks
+    if ((start_addr < FS_START) || (start_addr >= FS_END) ||
+        (start_addr + ((t_size / FS_ALIGN_BYTES) * FS_ALIGN_BYTES) >= FS_END))
+    {
+        P_ERROR("[ERROR]: Flash file system boundary error!\n");
+        return SPIFFS_FLASH_BOUNDARY_ERROR;
+    }
+
+    // let's use aligned ram variable
+    // warning: using stack instead of heap will produce hallucinations
+    uint32 buffer_space = (uint32)os_malloc(LOG_PAGE_SIZE + FS_ALIGN_BYTES);
+    uint32 *buffer = (uint32 *)(((buffer_space + FS_ALIGN_BYTES) / FS_ALIGN_BYTES) * FS_ALIGN_BYTES);
 
     while (t_size > 0)
     {
@@ -182,6 +196,15 @@ s32_t ICACHE_FLASH_ATTR flafs::spiffs_erase(u32_t t_addr, u32_t t_size)
 {
     P_TRACE("[TRACE]: spiffs erase called ------------------------------------\n");
     SpiFlashOpResult res;
+    // boundary checks
+    if ((((t_addr/FS_ALIGN_BYTES)*FS_ALIGN_BYTES) < FS_START) || 
+        (((t_addr/FS_ALIGN_BYTES)*FS_ALIGN_BYTES) >= FS_END) ||
+        (((t_addr/FS_ALIGN_BYTES)*FS_ALIGN_BYTES) + ((t_size / FS_ALIGN_BYTES) * FS_ALIGN_BYTES) >= FS_END))
+    {
+        P_ERROR("[ERROR]: Flash file system boundary error!\n");
+        return SPIFFS_FLASH_BOUNDARY_ERROR;
+    }
+
     // find sector number and offset from sector start
     uint16_t sect_number = t_addr / FLASH_SECT_SIZE;
     uint32_t sect_offset = t_addr % FLASH_SECT_SIZE;
