@@ -122,6 +122,7 @@ Espbot espbot;
 
 // dirty reference to esp8266_spiffs_test.cpp ...
 void run_tests(void);
+void run_tests_c(void);
 
 void ICACHE_FLASH_ATTR espbot_init(void)
 {

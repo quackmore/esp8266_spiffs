@@ -32,6 +32,8 @@ extern "C"
 #error "The flash map is not supported"
 #endif
 
+#define LOG_PAGE_SIZE (256)
+#define FLASH_SECT_SIZE (1024 * 4)
 #define FS_START SYSTEM_PARTITION_DATA
 #define FS_END SYSTEM_PARTITION_RF_CAL_ADDR
 #define FS_ALIGN_BYTES 4
@@ -40,6 +42,8 @@ extern "C"
 #define SPIFFS_FLASH_BOUNDARY_ERROR -10202
 
 // debug macros
+#define debug (1)
+#if debug
 #define P_FATAL(...) os_printf(__VA_ARGS__)
 #define P_ERROR(...) os_printf(__VA_ARGS__)
 #define P_WARN(...) os_printf(__VA_ARGS__)
@@ -47,6 +51,29 @@ extern "C"
 #define P_DEBUG(...) os_printf(__VA_ARGS__)
 #define P_TRACE(...) os_printf(__VA_ARGS__)
 #define P_ALL(...) os_printf(__VA_ARGS__)
+#else
+#define P_FATAL(...) \
+  {                  \
+  }
+#define P_ERROR(...) \
+  {                  \
+  }
+#define P_WARN(...) \
+  {                 \
+  }
+#define P_INFO(...) \
+  {                 \
+  }
+#define P_DEBUG(...) \
+  {                  \
+  }
+#define P_TRACE(...) \
+  {                  \
+  }
+#define P_ALL(...) \
+  {                \
+  }
+#endif
 
 // SPIFFS cpp wrapper customised for ESP8266 and SDK
 
@@ -55,63 +82,87 @@ extern "C"
 #include "spiffs.h"
 }
 
-#define SPIFFS_CACHE 0
+// flash memory functions
+s32_t esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst);
+s32_t esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src);
+s32_t esp_spiffs_erase(u32_t t_addr, u32_t t_size);
 
-class flafs
+typedef enum
+{
+  FFS_AVAILABLE = 222,
+  FFS_UNMOUNTED,
+  FFS_UNAVAILABLE,
+  FFS_CHECK_ERRORS
+} flashfs_status;
+
+class flashfs
 {
 protected:
-  // file system
-  static const int LOG_PAGE_SIZE = 256;
-  static const int FLASH_SECT_SIZE = (1024 * 4);
+  u8_t m_work[LOG_PAGE_SIZE * 2]; //  a ram memory buffer being double the size of the logical page size
+  u8_t m_fd_space[32 * 4];        // 4 file descriptors => 4 file opened simultaneously
+  // NO CACHE. To enable cache <#define SPIFFS_CACHE 1> in spiffs_config.h
+#if SPIFFS_CACHE
+  u8_t m_cache[(LOG_PAGE_SIZE + 32) * 4]; // 1152 bytes => cache
+#else
+  u8_t m_cache[1];
+#endif
+  // logical page buffer:     512 bytes
+  // file descriptor buffer:  128 bytes =>  768 bytes total without cache
+  // cache:                  1152 bytes => 1792 bytes total with cache
+  // TIP: To get the exact amount of bytes needed on your specific target,
+  // enable SPIFFS_BUFFER_HELP in spiffs_config.h, rebuild and call:
+  //   SPIFFS_buffer_bytes_for_filedescs
+  //   SPIFFS_buffer_bytes_for_cache
 
-  u8_t m_work[LOG_PAGE_SIZE * 2]; //  512 bytes
-  u8_t m_fd_space[32 * 8];        //  256 bytes => max 8 files
-                                  //  768 bytes total without cache
-  // NO CACHE. To enable cache <#define SPIFFS_CACHE 1> and uncomment following line for buffer definition
-  // u8_t m_cache[(LOG_PAGE_SIZE + 32) * 4]; // 1152 bytes => cache
-  // 1920 bytes total with cache
+  spiffs m_fs;            // file system handler
+  spiffs_config m_config; // file system configuration
 
-  spiffs *m_fs;                         // file system handler
-  spiffs_config *m_config;              // file system configuration
-  struct spiffs_dirent *m_current_file; // used for listing files
-  spiffs_check_callback check_cb_f();
-
-  // flash memory functions
-  s32_t spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst);
-  s32_t spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src);
-  s32_t spiffs_erase(u32_t t_addr, u32_t t_size);
+  flashfs_status status;
 
 public:
-  flafs(){};
-  ~flafs(){};
-  void init(void); // will mount the file system
-  void mount(void);
-  void umount(void);
-  void format(void);
+  flashfs(){};
+  ~flashfs(){};
+  void init(void);   // will mount the file system (eventually formatting it)
+  void format(void); // will clean everything, a new init is required after this
+  flashfs_status get_status();
+  bool is_available();
+  s32_t last_error();
+  s32_t check();
   u32_t get_total_size();
-  u32_t get_available_size();
   u32_t get_used_size();
   struct spiffs_dirent *list(int); // (0) => return first file information
                                    // (1) => return next file information
+  spiffs *get_handle();
 };
+
+typedef enum
+{
+  FFS_F_UNAVAILABLE = 222,
+  FFS_F_OPEN,
+  FFS_F_MODIFIED_UNSAVED,
+  FFS_F_REMOVED
+} flashfs_file_status;
 
 class ffile
 {
 private:
   spiffs *m_fs;
+  spiffs_file m_fd;
   char m_name[32];
-  char status;
+  flashfs_file_status status;
 
 public:
-  ffile(spiffs *, char *){};
-  ~ffile(){};
-  char get_status();
-  void read(char *);
-  void n_read(char *, int);
-  void write(char *);
-  void append(char *);
-  void rename();
+  ffile(spiffs *);
+  ffile(spiffs *, char *);
+  ~ffile();
+  char *get_name();
+  void set_name(char *);
+  flashfs_file_status get_status();
+  int n_read(char *, int);
+  int n_append(char *, int);
+  void clear();
   void remove();
+  void flush_cache();
   /*
       {
         ffile cfg(&fs, "config.cfg"); // constructor will open or create the file
