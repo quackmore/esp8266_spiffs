@@ -8,11 +8,11 @@ Including a C++ wrapper to make everything easier.
 
 # Integrating
 
-The repo comes with everything you nedd for building a full application running tests.
+The repo comes with everything you need for building a full application running tests.
 
 In case you just need SPIFFS use the following files:
 
-        ├── bin
+        	├── bin
 		│   └── upgrade
 		│       └── www
 		└── src
@@ -38,7 +38,7 @@ In case you just need SPIFFS use the following files:
 
 While if you want to include the C++ wrapper use the following files:
 
-        ├── bin
+        	├── bin
 		│   └── upgrade
 		│       └── www
 		└── src
