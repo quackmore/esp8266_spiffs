@@ -45,7 +45,6 @@ While if you want to include the C++ wrapper use the following files:
 		    ├── driver
 		    ├── espbot
 		    │   ├── esp8266_spiffs.cpp
-		    │   ├── esp8266_spiffs_test.cpp
 		    │   ├── ... 
 		    │   └── spiffs_flash_functions.c
 		    ├── include
