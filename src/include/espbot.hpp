@@ -36,7 +36,7 @@ private:
   static const int QUEUE_LEN = 4;
   os_event_t *m_queue;
   // heartbeat timer
-  static const int HEARTBEAT_PERIOD = 20000;
+  static const int HEARTBEAT_PERIOD = 60000;
   os_timer_t m_heartbeat;
 
 protected:
