@@ -9,240 +9,14 @@
 
 extern "C"
 {
-#include "c_types.h"
-#include "osapi.h"
-#include "user_interface.h"
-#include "mem.h"
-#include "spi_flash.h"
+#include "spiffs_flash_functions.h"
 }
 
 #include "esp8266_spiffs.hpp"
 
-// flash read function (checkout SPIFFS documentation)
-s32_t ICACHE_FLASH_ATTR esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)
+ICACHE_FLASH_ATTR flashfs::flashfs()
 {
-    // P_TRACE("[TRACE]: spiffs read called --------------------------------------\n");
-    SpiFlashOpResult res;
-    // find aligned start address
-    u32_t start_addr = (t_addr / FS_ALIGN_BYTES) * FS_ALIGN_BYTES;
-    // and how many bytes are required by alignment
-    int align_bytes = t_addr % FS_ALIGN_BYTES;
-
-    // boundary checks
-    if ((start_addr < FS_START) || (start_addr >= FS_END) ||
-        (start_addr + ((t_size / FS_ALIGN_BYTES) * FS_ALIGN_BYTES) > FS_END))
-    {
-        P_ERROR("[ERROR]: Flash file system boundary error!\n");
-        P_ERROR("[ERROR]: Reading from address: %X, size: %d\n", t_addr, t_size);
-        return SPIFFS_FLASH_BOUNDARY_ERROR;
-    }
-
-    // let's use aligned ram variables
-    // warning: using stack instead of heap will produce hallucinations
-    uint32 buffer_space = (uint32)os_malloc(LOG_PAGE_SIZE + FS_ALIGN_BYTES);
-    uint32 *buffer = (uint32 *)(((buffer_space + FS_ALIGN_BYTES) / FS_ALIGN_BYTES) * FS_ALIGN_BYTES);
-
-    while (t_size > 0)
-    {
-        // P_TRACE("[TRACE]: bytes to be read %d, unaligned addr %X, aligned addr %X, align bytes %d\n",
-        //         t_size, t_addr, start_addr, align_bytes);
-        // read F_BUF_SIZE bytes from flash
-        res = spi_flash_read(start_addr, buffer, LOG_PAGE_SIZE);
-        system_soft_wdt_feed();
-        if (res == SPI_FLASH_RESULT_ERR)
-        {
-            P_ERROR("[ERROR]: error reading flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
-            os_free((void *)buffer_space);
-            return SPIFFS_FLASH_RESULT_ERR;
-        }
-        if (res == SPI_FLASH_RESULT_TIMEOUT)
-        {
-            P_ERROR("[ERROR]: timeout reading flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
-            os_free((void *)buffer_space);
-            return SPIFFS_FLASH_RESULT_TIMEOUT;
-        }
-
-        // check if must read again from flash
-        if (t_size > (LOG_PAGE_SIZE - align_bytes))
-        {
-            // discard initial bytes required by alignment (if any)
-            // and copy to destination
-            // P_TRACE("[TRACE]: copying %d bytes from %X to bytes to %X\n",
-            //         (LOG_PAGE_SIZE - align_bytes), buffer + align_bytes, t_dst);
-            os_memcpy(t_dst, buffer + align_bytes, (LOG_PAGE_SIZE - align_bytes));
-            t_dst += (LOG_PAGE_SIZE - align_bytes);
-            t_size -= (LOG_PAGE_SIZE - align_bytes);
-            start_addr += (LOG_PAGE_SIZE);
-            align_bytes = 0;
-        }
-        else
-        {
-            // just copy required bytes
-            // P_TRACE("[TRACE]: copying %d bytes from %X to bytes to %X\n",
-            //         t_size, buffer + align_bytes, t_dst);
-            os_memcpy(t_dst, buffer + align_bytes, t_size);
-            t_size = 0;
-        }
-    }
-    os_free((void *)buffer_space);
-    return SPIFFS_OK;
-}
-
-// flash write function (checkout SPIFFS documentation)
-s32_t ICACHE_FLASH_ATTR esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src)
-{
-    // P_TRACE("[TRACE]: spiffs write called -------------------------------------\n");
-    SpiFlashOpResult res;
-    // find aligned start address
-    u32_t start_addr = (t_addr / FS_ALIGN_BYTES) * FS_ALIGN_BYTES;
-    // and how many bytes are required by alignment
-    u8_t align_bytes = t_addr % FS_ALIGN_BYTES;
-
-    // boundary checks
-    if ((start_addr < FS_START) || (start_addr >= FS_END) ||
-        (start_addr + ((t_size / FS_ALIGN_BYTES) * FS_ALIGN_BYTES) > FS_END))
-    {
-        P_ERROR("[ERROR]: Flash file system boundary error!\n");
-        P_ERROR("[ERROR]: Writing to address: %X, size: %d\n", t_addr, t_size);
-        return SPIFFS_FLASH_BOUNDARY_ERROR;
-    }
-
-    // let's use aligned ram variable
-    // warning: using stack instead of heap will produce hallucinations
-    uint32 buffer_space = (uint32)os_malloc(LOG_PAGE_SIZE + FS_ALIGN_BYTES);
-    uint32 *buffer = (uint32 *)(((buffer_space + FS_ALIGN_BYTES) / FS_ALIGN_BYTES) * FS_ALIGN_BYTES);
-
-    while (t_size > 0)
-    {
-        // P_TRACE("[TRACE]: bytes to be written %d, unaligned addr %X, aligned addr %X, align bytes %d\n",
-        //         t_size, t_addr, start_addr, align_bytes);
-        // read LOG_PAGE_SIZE bytes from flash into buffer
-        res = spi_flash_read(start_addr, (uint32 *)buffer, LOG_PAGE_SIZE);
-        system_soft_wdt_feed();
-        if (res == SPI_FLASH_RESULT_ERR)
-        {
-            P_ERROR("[ERROR]: error reading flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
-            os_free((void *)buffer_space);
-            return SPIFFS_FLASH_RESULT_ERR;
-        }
-        if (res == SPI_FLASH_RESULT_TIMEOUT)
-        {
-            P_ERROR("[ERROR]: timeout reading flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
-            os_free((void *)buffer_space);
-            return SPIFFS_FLASH_RESULT_TIMEOUT;
-        }
-
-        if (t_size > (LOG_PAGE_SIZE - align_bytes))
-        {
-            // discard initial bytes required by alignment (if any)
-            // and copy source data to buffer
-            // P_TRACE("[TRACE]: copying %d bytes from %X to bytes to %X\n",
-            //         LOG_PAGE_SIZE - align_bytes, t_src, (u8_t *)buffer + align_bytes);
-            os_memcpy((u8_t *)buffer + align_bytes, t_src, LOG_PAGE_SIZE - align_bytes);
-            // and write buffer to flash
-            // P_TRACE("[TRACE]: writing %d bytes to flash %X from %X\n",
-            //         LOG_PAGE_SIZE, start_addr, buffer);
-            res = spi_flash_write(start_addr, (uint32 *)buffer, LOG_PAGE_SIZE);
-            system_soft_wdt_feed();
-
-            if (res == SPI_FLASH_RESULT_ERR)
-            {
-                P_ERROR("[ERROR]: Error writing flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
-                os_free((void *)buffer_space);
-                return SPIFFS_FLASH_RESULT_ERR;
-            }
-            if (res == SPI_FLASH_RESULT_TIMEOUT)
-            {
-                P_ERROR("[ERROR]: Timeout writing flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
-                os_free((void *)buffer_space);
-                return SPIFFS_FLASH_RESULT_TIMEOUT;
-            }
-
-            t_src += (LOG_PAGE_SIZE - align_bytes);
-            t_size -= (LOG_PAGE_SIZE - align_bytes);
-            start_addr += (LOG_PAGE_SIZE);
-            align_bytes = 0;
-        }
-        else
-        {
-            // just copy required bytes to buffer
-            // P_TRACE("[TRACE]: copying %d bytes from %X to bytes to %X\n",
-            //         t_size, t_src, (u8_t *)buffer + align_bytes);
-            os_memcpy((u8_t *)buffer + align_bytes, t_src, t_size);
-            // and write buffer to flash
-            // P_TRACE("[TRACE]: writing %d bytes to flash %X from %X\n",
-            //         LOG_PAGE_SIZE, start_addr, buffer);
-            res = spi_flash_write(start_addr, (uint32 *)buffer, LOG_PAGE_SIZE);
-            system_soft_wdt_feed();
-
-            if (res == SPI_FLASH_RESULT_ERR)
-            {
-                P_ERROR("[ERROR]: Error writing flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
-                os_free((void *)buffer_space);
-                return SPIFFS_FLASH_RESULT_ERR;
-            }
-            if (res == SPI_FLASH_RESULT_TIMEOUT)
-            {
-                P_ERROR("[ERROR]: Timeout writing flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
-                os_free((void *)buffer_space);
-                return SPIFFS_FLASH_RESULT_TIMEOUT;
-            }
-            t_size = 0;
-        }
-    }
-    os_free((void *)buffer_space);
-    return SPIFFS_OK;
-}
-
-// flash erase function (checkout SPIFFS documentation)
-s32_t ICACHE_FLASH_ATTR esp_spiffs_erase(u32_t t_addr, u32_t t_size)
-{
-    // P_TRACE("[TRACE]: spiffs erase called ------------------------------------\n");
-    SpiFlashOpResult res;
-    // boundary checks
-    if ((((t_addr / FS_ALIGN_BYTES) * FS_ALIGN_BYTES) < FS_START) ||
-        (((t_addr / FS_ALIGN_BYTES) * FS_ALIGN_BYTES) >= FS_END) ||
-        (((t_addr / FS_ALIGN_BYTES) * FS_ALIGN_BYTES) + ((t_size / FS_ALIGN_BYTES) * FS_ALIGN_BYTES) > FS_END))
-    {
-        P_ERROR("[ERROR]: Flash file system boundary error!\n");
-        P_ERROR("[ERROR]: Erasing from address: %X, size: %d\n", t_addr, t_size);
-        return SPIFFS_FLASH_BOUNDARY_ERROR;
-    }
-
-    // find sector number and offset from sector start
-    uint16_t sect_number = t_addr / FLASH_SECT_SIZE;
-    uint32_t sect_offset = t_addr % FLASH_SECT_SIZE;
-
-    while (t_size > 0)
-    {
-        // P_TRACE("[TRACE]: bytes to be erased %d, sector num %d, sector offset %d\n",
-        //         t_size, sect_number, sect_offset);
-        // erase sector
-        res = spi_flash_erase_sector(sect_number);
-        if (res == SPI_FLASH_RESULT_ERR)
-        {
-            P_ERROR("[ERROR]: Error erasing flash sector %d\n", sect_number);
-            return SPIFFS_FLASH_RESULT_ERR;
-        }
-        if (res == SPI_FLASH_RESULT_TIMEOUT)
-        {
-            P_ERROR("[ERROR]: Timeout erasing flash sector %d\n", sect_number);
-            return SPIFFS_FLASH_RESULT_TIMEOUT;
-        }
-
-        // check if must delete more than one sector
-        if (t_size > (FLASH_SECT_SIZE - sect_offset))
-        {
-            t_size -= (FLASH_SECT_SIZE - sect_offset);
-            sect_number += 1;
-            sect_offset = 0;
-        }
-        else
-        {
-            t_size = 0;
-        }
-    }
-    return SPIFFS_OK;
+    status = FFS_NOT_INIT;
 }
 
 void ICACHE_FLASH_ATTR flashfs::init(void)
@@ -253,6 +27,7 @@ void ICACHE_FLASH_ATTR flashfs::init(void)
     // 3) Otherwise, call SPIFFS_unmount and call SPIFFS_format
     // 4) Call SPIFFS_mount again.
     s32_t res;
+    status = FFS_UNAVAILABLE;
 
     m_config.phys_size = FS_END - FS_START; // use all spi flash
     m_config.phys_addr = FS_START;          // start spiffs at start of spi flash
@@ -326,6 +101,11 @@ void ICACHE_FLASH_ATTR flashfs::init(void)
 
 void ICACHE_FLASH_ATTR flashfs::format(void)
 {
+    if (status == FFS_NOT_INIT)
+    {
+        P_ERROR("[ERROR]: formatting a not initialized file system\n");
+        return;
+    }
     s32_t res;
     P_TRACE("[TRACE]: Unmounting the file system.\n");
     SPIFFS_unmount(&m_fs);
@@ -343,6 +123,18 @@ void ICACHE_FLASH_ATTR flashfs::format(void)
     }
 }
 
+void ICACHE_FLASH_ATTR flashfs::unmount(void)
+{
+    if (status == FFS_NOT_INIT)
+    {
+        P_ERROR("[ERROR]: unmounting a not initialized file system\n");
+        return;
+    }
+    SPIFFS_unmount(&m_fs);
+    P_TRACE("[TRACE]: File system unmounted.\n");
+    status = FFS_UNMOUNTED;
+}
+
 flashfs_status ICACHE_FLASH_ATTR flashfs::get_status()
 {
     return status;
@@ -350,7 +142,7 @@ flashfs_status ICACHE_FLASH_ATTR flashfs::get_status()
 
 bool ICACHE_FLASH_ATTR flashfs::is_available()
 {
-    if ((status == FFS_AVAILABLE) || (FFS_CHECK_ERRORS))
+    if ((status == FFS_AVAILABLE) || (status == FFS_ERRORS))
         return true;
     else
         return false;
@@ -358,11 +150,21 @@ bool ICACHE_FLASH_ATTR flashfs::is_available()
 
 s32_t ICACHE_FLASH_ATTR flashfs::last_error()
 {
+    if (status == FFS_NOT_INIT)
+    {
+        P_ERROR("[ERROR]: looking for last error of a not initialized file system\n");
+        return 0;
+    }
     return SPIFFS_errno(&m_fs);
 }
 
 u32_t ICACHE_FLASH_ATTR flashfs::get_total_size()
 {
+    if (status == FFS_NOT_INIT)
+    {
+        P_ERROR("[ERROR]: looking for total size of a not initialized file system\n");
+        return 0;
+    }
     s32_t res;
     u32_t total = 0;
     u32_t used = 0;
@@ -371,6 +173,11 @@ u32_t ICACHE_FLASH_ATTR flashfs::get_total_size()
 }
 u32_t ICACHE_FLASH_ATTR flashfs::get_used_size()
 {
+    if (status == FFS_NOT_INIT)
+    {
+        P_ERROR("[ERROR]: looking for used size of a not initialized file system\n");
+        return 0;
+    }
     s32_t res;
     u32_t total = 0;
     u32_t used = 0;
@@ -380,6 +187,11 @@ u32_t ICACHE_FLASH_ATTR flashfs::get_used_size()
 
 s32_t ICACHE_FLASH_ATTR flashfs::check()
 {
+    if (status == FFS_NOT_INIT)
+    {
+        P_ERROR("[ERROR]: checking a not initialized file system\n");
+        return 0;
+    }
     s32_t res = SPIFFS_check(&m_fs);
     if (res == SPIFFS_OK)
     {
@@ -389,13 +201,18 @@ s32_t ICACHE_FLASH_ATTR flashfs::check()
     else
     {
         P_ERROR("[ERROR]: File system check found errors, error code %d\n", res);
-        status = FFS_CHECK_ERRORS;
+        status = FFS_ERRORS;
     }
     return res;
 }
 
 struct spiffs_dirent ICACHE_FLASH_ATTR *flashfs::list(int t_file)
 {
+    if (status == FFS_NOT_INIT)
+    {
+        P_ERROR("[ERROR]: listing a not initialized file system\n");
+        return NULL;
+    }
     static spiffs_DIR dd;
     static struct spiffs_dirent ffile;
     struct spiffs_dirent *pfile;
@@ -408,51 +225,75 @@ struct spiffs_dirent ICACHE_FLASH_ATTR *flashfs::list(int t_file)
     return pfile;
 }
 
-spiffs ICACHE_FLASH_ATTR *flashfs::get_handle()
+spiffs ICACHE_FLASH_ATTR *flashfs::get_handler()
 {
+    if (status == FFS_NOT_INIT)
+    {
+        P_ERROR("[ERROR]: looking for handler of a not initialized file system\n");
+        return NULL;
+    }
     return &m_fs;
 }
 
 // create a new file with no name, no operations will be permitted
 // the file status is set to FFS_F_UNAVAILABLE
-ICACHE_FLASH_ATTR ffile::ffile(spiffs *t_fs)
+ICACHE_FLASH_ATTR ffile::ffile(flashfs *t_fs)
 {
-    m_fs = t_fs;
-    m_name[0] = '\0';
     status = FFS_F_UNAVAILABLE;
+    m_name[0] = '\0';
+    if (t_fs->is_available())
+    {
+        m_fs = t_fs;
+    }
+    else
+    {
+        m_fs = NULL;
+        P_ERROR("[ERROR]: creating file on a not available file system\n");
+    }
 }
 
 // create a new file variable with the specified name
 // create a new file, or open if it exists, ready for READ and WRITE (APPEND) operations
 // in case of errors the file status is set to FFS_F_UNAVAILABLE
-ICACHE_FLASH_ATTR ffile::ffile(spiffs *t_fs, char *t_filename)
+ICACHE_FLASH_ATTR ffile::ffile(flashfs *t_fs, char *t_filename)
 {
-    m_fs = t_fs;
+    status = FFS_F_UNAVAILABLE;
     os_strncpy(m_name, t_filename, 30);
     if (os_strlen(t_filename) > 30)
     {
         P_WARN("[WARNING]: Filename will be truncated to 30 characters\n");
         m_name[30] = '\0';
     }
-    m_fd = SPIFFS_open(m_fs, m_name, SPIFFS_CREAT | SPIFFS_RDWR | SPIFFS_APPEND, 0);
-    if (m_fd < 0)
+    if (t_fs->is_available())
     {
-        P_ERROR("[ERROR]: Error %d while opening file %s\n", SPIFFS_errno(m_fs), m_name);
-        status = FFS_F_UNAVAILABLE;
+        m_fs = t_fs;
+        m_fd = SPIFFS_open(m_fs->get_handler(), m_name, SPIFFS_CREAT | SPIFFS_RDWR | SPIFFS_APPEND, 0);
+        if (m_fd < 0)
+        {
+            P_ERROR("[ERROR]: Error %d while opening file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+        }
+        else
+            status = FFS_F_OPEN;
     }
     else
-        status = FFS_F_OPEN;
+    {
+        m_fs = NULL;
+        P_ERROR("[ERROR]: creating file on a not available file system\n");
+    }
 }
 
 // close the file (if open)
 // and eventually flush chache to flash memory
 ICACHE_FLASH_ATTR ffile::~ffile()
 {
-    if ((status == FFS_F_OPEN) || (status == FFS_F_MODIFIED_UNSAVED))
+    if (m_fs && (m_fs->is_available()))
     {
-        s32_t res = SPIFFS_close(m_fs, m_fd);
-        if (res != SPIFFS_OK)
-            P_ERROR("[ERROR]: Error %d while closing file %s\n", SPIFFS_errno(m_fs), m_name);
+        if ((status == FFS_F_OPEN) || (status == FFS_F_MODIFIED_UNSAVED))
+        {
+            s32_t res = SPIFFS_close(m_fs->get_handler(), m_fd);
+            if (res != SPIFFS_OK)
+                P_ERROR("[ERROR]: Error %d while closing file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+        }
     }
 }
 
@@ -472,28 +313,36 @@ char ICACHE_FLASH_ATTR *ffile::get_name()
 // then
 // create a new file, or open if it exists, ready for READ and WRITE (APPEND) operations
 // in case of errors the file status is set to FFS_F_UNAVAILABLE
-void ICACHE_FLASH_ATTR ffile::set_name(char *t_filename)
+void ICACHE_FLASH_ATTR ffile::open(char *t_filename)
 {
-    if ((status == FFS_F_OPEN) || (status == FFS_F_MODIFIED_UNSAVED))
+    if (m_fs && (m_fs->is_available()))
     {
-        s32_t res = SPIFFS_close(m_fs, m_fd);
-        if (res != SPIFFS_OK)
-            P_ERROR("[ERROR]: Error %d while closing file %s\n", SPIFFS_errno(m_fs), m_name);
-    }
-    os_strncpy(m_name, t_filename, 30);
-    if (os_strlen(t_filename) > 30)
-    {
-        P_WARN("[WARNING]: Filename will be truncated to 30 characters\n");
-        m_name[30] = '\0';
-    }
-    m_fd = SPIFFS_open(m_fs, m_name, SPIFFS_CREAT | SPIFFS_RDWR | SPIFFS_APPEND, 0);
-    if (m_fd < 0)
-    {
-        P_ERROR("[ERROR]: Error %d while opening file %s\n", SPIFFS_errno(m_fs), m_name);
-        status = FFS_F_UNAVAILABLE;
+        if ((status == FFS_F_OPEN) || (status == FFS_F_MODIFIED_UNSAVED))
+        {
+            s32_t res = SPIFFS_close(m_fs->get_handler(), m_fd);
+            if (res != SPIFFS_OK)
+                P_ERROR("[ERROR]: Error %d while closing file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+        }
+        os_strncpy(m_name, t_filename, 30);
+        if (os_strlen(t_filename) > 30)
+        {
+            P_WARN("[WARNING]: Filename will be truncated to 30 characters\n");
+            m_name[30] = '\0';
+        }
+        m_fd = SPIFFS_open(m_fs->get_handler(), m_name, SPIFFS_CREAT | SPIFFS_RDWR | SPIFFS_APPEND, 0);
+        if (m_fd < 0)
+        {
+            P_ERROR("[ERROR]: Error %d while opening file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+            status = FFS_F_UNAVAILABLE;
+        }
+        else
+            status = FFS_F_OPEN;
     }
     else
-        status = FFS_F_OPEN;
+    {
+        status = FFS_F_UNAVAILABLE;
+        P_ERROR("[ERROR]: opening file on a not available file system\n");
+    }
 }
 
 // return the file status
@@ -502,21 +351,39 @@ flashfs_file_status ICACHE_FLASH_ATTR ffile::get_status()
     return status;
 }
 
+// return the file status
+bool ICACHE_FLASH_ATTR ffile::is_available()
+{
+    if ((status == FFS_F_OPEN) || (FFS_F_MODIFIED_UNSAVED))
+        return true;
+    else
+        return false;
+}
+
 // read t_len bytes from the file to the t_buffer
 int ICACHE_FLASH_ATTR ffile::n_read(char *t_buffer, int t_len)
 {
     s32_t res = 0;
-    if ((status == FFS_F_OPEN) || (status == FFS_F_MODIFIED_UNSAVED))
+    if (m_fs && (m_fs->is_available()))
     {
-        res = SPIFFS_read(m_fs, m_fd, (u8_t *)t_buffer, t_len);
-        if (res < SPIFFS_OK)
+        if ((status == FFS_F_OPEN) || (status == FFS_F_MODIFIED_UNSAVED))
         {
-            P_ERROR("[ERROR]: Error %d while reading from file %s\n", SPIFFS_errno(m_fs), m_name);
+            res = SPIFFS_read(m_fs->get_handler(), m_fd, (u8_t *)t_buffer, t_len);
+            if (res < SPIFFS_OK)
+            {
+                P_ERROR("[ERROR]: Error %d while reading from file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+            }
+        }
+        else
+        {
+            P_ERROR("[ERROR]: Cannot read from file %s, file status is %d\n", m_name, status);
         }
     }
     else
     {
-        P_ERROR("[ERROR]: Cannot read from file %s, file status is %d\n", m_name, status);
+        status = FFS_F_UNAVAILABLE;
+        P_ERROR("[ERROR]: reading file on a not available file system\n");
+        res = -1;
     }
     return (int)res;
 }
@@ -525,19 +392,28 @@ int ICACHE_FLASH_ATTR ffile::n_read(char *t_buffer, int t_len)
 int ICACHE_FLASH_ATTR ffile::n_append(char *t_buffer, int t_len)
 {
     s32_t res = 0;
-    if ((status == FFS_F_OPEN) || (status == FFS_F_MODIFIED_UNSAVED))
+    if (m_fs && (m_fs->is_available()))
     {
-        res = SPIFFS_write(m_fs, m_fd, (u8_t *)t_buffer, t_len);
-        if (res < SPIFFS_OK)
+        if ((status == FFS_F_OPEN) || (status == FFS_F_MODIFIED_UNSAVED))
         {
-            P_ERROR("[ERROR]: Error %d while writing to file %s\n", SPIFFS_errno(m_fs), m_name);
+            res = SPIFFS_write(m_fs->get_handler(), m_fd, (u8_t *)t_buffer, t_len);
+            if (res < SPIFFS_OK)
+            {
+                P_ERROR("[ERROR]: Error %d while writing to file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+            }
+            else
+                status = FFS_F_MODIFIED_UNSAVED;
         }
         else
-            status = FFS_F_MODIFIED_UNSAVED;
+        {
+            P_ERROR("[ERROR]: Cannot write to file %s, file status is %d\n", m_name, status);
+        }
     }
     else
     {
-        P_ERROR("[ERROR]: Cannot write to file %s, file status is %d\n", m_name, status);
+        status = FFS_F_UNAVAILABLE;
+        P_ERROR("[ERROR]: writing file on a not available file system\n");
+        res = -1;
     }
     return (int)res;
 }
@@ -545,42 +421,78 @@ int ICACHE_FLASH_ATTR ffile::n_append(char *t_buffer, int t_len)
 // clear the file content
 void ICACHE_FLASH_ATTR ffile::clear()
 {
-    if ((status == FFS_F_OPEN) || (status == FFS_F_MODIFIED_UNSAVED))
+    if (m_fs && (m_fs->is_available()))
     {
-        s32_t res = SPIFFS_close(m_fs, m_fd);
-        if (res != SPIFFS_OK)
-            P_ERROR("[ERROR]: Error %d while closing file %s\n", SPIFFS_errno(m_fs), m_name);
-        m_fd = SPIFFS_open(m_fs, m_name, SPIFFS_CREAT | SPIFFS_TRUNC | SPIFFS_RDWR | SPIFFS_APPEND, 0);
-        if (m_fd < 0)
+        if ((status == FFS_F_OPEN) || (status == FFS_F_MODIFIED_UNSAVED))
         {
-            P_ERROR("[ERROR]: Error %d while opening file %s\n", SPIFFS_errno(m_fs), m_name);
-            status = FFS_F_UNAVAILABLE;
+            s32_t res = SPIFFS_close(m_fs->get_handler(), m_fd);
+            if (res != SPIFFS_OK)
+                P_ERROR("[ERROR]: Error %d while closing file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+            m_fd = SPIFFS_open(m_fs->get_handler(), m_name, SPIFFS_CREAT | SPIFFS_TRUNC | SPIFFS_RDWR | SPIFFS_APPEND, 0);
+            if (m_fd < 0)
+            {
+                P_ERROR("[ERROR]: Error %d while opening file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+                status = FFS_F_UNAVAILABLE;
+            }
+            else
+                status = FFS_F_MODIFIED_UNSAVED;
         }
         else
-            status = FFS_F_MODIFIED_UNSAVED;
+        {
+            P_ERROR("[ERROR]: Cannot clear file %s, file status is %d\n", m_name, status);
+        }
+    }
+    else
+    {
+        status = FFS_F_UNAVAILABLE;
+        P_ERROR("[ERROR]: clearing file on a not available file system\n");
     }
 }
 
 // remove the file
 void ICACHE_FLASH_ATTR ffile::remove()
 {
-    if ((status == FFS_F_OPEN) || (status == FFS_F_MODIFIED_UNSAVED))
+    if (m_fs && (m_fs->is_available()))
     {
-        s32_t res = SPIFFS_fremove(m_fs, m_fd);
-        if (res != SPIFFS_OK)
-            P_ERROR("[ERROR]: Error %d while removing file %s\n", SPIFFS_errno(m_fs), m_name);
+        if ((status == FFS_F_OPEN) || (status == FFS_F_MODIFIED_UNSAVED))
+        {
+            s32_t res = SPIFFS_fremove(m_fs->get_handler(), m_fd);
+            if (res != SPIFFS_OK)
+                P_ERROR("[ERROR]: Error %d while removing file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+            else
+                status = FFS_F_REMOVED;
+        }
         else
-            status = FFS_F_REMOVED;
+        {
+            P_ERROR("[ERROR]: Cannot remove file %s, file status is %d\n", m_name, status);
+        }
+    }
+    else
+    {
+        status = FFS_F_UNAVAILABLE;
+        P_ERROR("[ERROR]: removing file on a not available file system\n");
     }
 }
 
 // flush chached changes to the flash memory
 void ICACHE_FLASH_ATTR ffile::flush_cache()
 {
-    if (status == FFS_F_MODIFIED_UNSAVED)
+    if (m_fs && (m_fs->is_available()))
     {
-        s32_t res = SPIFFS_fflush(m_fs, m_fd);
-        if (res < SPIFFS_OK)
-            P_ERROR("[ERROR]: Error %d while flushing cache for file %s\n", SPIFFS_errno(m_fs), m_name);
+        if (status == FFS_F_MODIFIED_UNSAVED)
+        {
+            s32_t res = SPIFFS_fflush(m_fs->get_handler(), m_fd);
+            if (res < SPIFFS_OK)
+                P_ERROR("[ERROR]: Error %d while flushing cache for file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+        }
+        else
+        {
+            P_ERROR("[ERROR]: Cannot flush cache for file %s, file status is %d\n", m_name, status);
+        }
+    }
+    else
+    {
+        status = FFS_F_UNAVAILABLE;
+        P_ERROR("[ERROR]: flushing cache on a not available file system\n");
     }
 }

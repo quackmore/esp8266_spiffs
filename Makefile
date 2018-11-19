@@ -296,6 +296,7 @@ CCFLAGS += 			\
 	-fdata-sections	\
 	-fno-builtin-printf \
 	-fno-exceptions \
+  -Wno-write-strings \
   -DESPBOT_RELEASE=\"$(GIT_VERSION)\" \
 	-DSPI_FLASH_SIZE_MAP=$(SPI_SIZE_MAP)
 #	-Wall			
