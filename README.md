@@ -3,7 +3,7 @@
 # Summary
 
 Spiffs for ESP8266 NON-OS SDK.
-Forked from https://github.com/pellepl/spiffs then customized for NON-OS SDK, with no other dependecies.
+Forked from https://github.com/pellepl/spiffs (thank you so much pellepl) then customized for NON-OS SDK, with no other dependecies.
 Including a C++ wrapper to make everything easier.
 
 # Integrating
