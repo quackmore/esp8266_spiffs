@@ -1,48 +1,84 @@
-# esp8266_SDK_structure #
+# esp8266_spiffs #
 
 # Summary
 
-Empty project structure for ESP8266 app based on NON-OS SDK.
+Spiffs for ESP8266 NON-OS SDK.
+Forked from https://github.com/pellepl/spiffs (thank you so much pellepl) then customized for NON-OS SDK, with no other dependecies.
+Including a C++ wrapper to make everything easier.
+
+# Integrating
+
+The repo comes with everything you need for building a full application running tests.
+
+In case you just need SPIFFS use the following files:
+
+        	├── bin
+		│   └── upgrade
+		│       └── www
+		└── src
+		    ├── driver
+		    ├── espbot
+		    │   ├── ... 
+		    │   └── spiffs_flash_functions.c
+		    ├── include
+		    │   ├── ...
+		    │   ├── spiffs_config.h
+		    │   ├── spiffs_flash_functions.h
+		    │   ├── spiffs.h
+		    │   ├── spiffs_nucleus.h
+		    │   └── ...
+		    ├── spiffs
+		    │   ├── ...
+		    │   ├── spiffs_cache.c
+		    │   ├── spiffs_check.c
+		    │   ├── spiffs_gc.c
+		    │   ├── spiffs_hydrogen.c
+		    │   └── spiffs_nucleus.c
+		    └── user
+
+While if you want to include the C++ wrapper use the following files:
+
+        	├── bin
+		│   └── upgrade
+		│       └── www
+		└── src
+		    ├── driver
+		    ├── espbot
+		    │   ├── esp8266_spiffs.cpp
+		    │   ├── ... 
+		    │   └── spiffs_flash_functions.c
+		    ├── include
+		    │   ├── esp8266_spiffs.hpp
+		    │   ├── ...
+		    │   ├── spiffs_config.h
+		    │   ├── spiffs_flash_functions.h
+		    │   ├── spiffs.h
+		    │   ├── spiffs_nucleus.h
+		    │   └── ...
+		    ├── spiffs
+		    │   ├── ...
+		    │   ├── spiffs_cache.c
+		    │   ├── spiffs_check.c
+		    │   ├── spiffs_gc.c
+		    │   ├── spiffs_hydrogen.c
+		    │   └── spiffs_nucleus.c
+		    └── user
+
+
+Change the macros in spiffs_flash_functions.h to disable debug serial output
+		#define debug (0)
 
 # Using
 
-## Building the binaries 
-Basic:
+Checkout SPIFFS documentation.
+And C++ header files for the wrapper.
 
-	# well this is easy ...
-	make
+# Building the binaries 
+Checkout my other repo https://github.com/quackmore/esp8266_SDK_structure for details.
 
-While for building both APP1 and APP2 and make them available for FOTA:
-
-	# this is boring ...
-	export APP=1
-	make clean
-	make
-	cp bin/upgrade/user1.4096.new.4.bin bin/upgrade/www/user1.bin
-	export APP=2
-	make clean
-	make
-	cp bin/upgrade/user2.4096.new.4.bin bin/upgrade/www/user2.bin
-	make | grep VERSION: | awk '{print $2}' >bin/upgrade/www/version.txt
-
-## Flashing ESP8266
-
-## Preparing the flash
-
-	# this is an example, customize it to your needs
-	# clear the flash
-	esptool.py --port /dev/ttyUSB0 erase_flash
-
-	# setup the flash with boot and SDK parameters
-	esptool.py --port /dev/ttyUSB0 write_flash -fm dio -fs 32m -ff 40m 0x00000 <your path>/ESP8266_NONOS_SDK/bin/boot_v1.7.bin 0x3FB000 <your path>/ESP8266_NONOS_SDK/bin/blank.bin 0x3FC000 <your path>/ESP8266_NONOS_SDK/bin/esp_init_data_default_v08.bin 0x3FE000 <your path>/ESP8266_NONOS_SDK/bin/blank.bin
-
-## Flashing the app
-
-	# this is an example, customize it to your needs
-	esptool.py --port /dev/ttyUSB0 write_flash -fm dio -fs 32m -ff 40m 0x01000 bin/upgrade/user1.4096.new.4.bin
 
 # License
 
-esp8266_SDK_structure comes with a [BEER-WARE] license.
+In addition to SPIFFS licence esp8266_spiffs comes with a [BEER-WARE] license.
 
 Enjoy.

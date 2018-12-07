@@ -24,6 +24,7 @@ SPECIAL_MKTARGETS=$(APP_MKTARGETS)
 SUBDIRS=    \
 	driver    \
 	user    \
+	spiffs    \
 	espbot
 
 endif # } PDIR
@@ -50,6 +51,7 @@ endif
 COMPONENTS_eagle.app.v6 = \
 	driver/libdriver.a  \
 	user/libuser.a  \
+	spiffs/libspiffs.a  \
 	espbot/libespbot.a
 
 LINKFLAGS_eagle.app.v6 = \
