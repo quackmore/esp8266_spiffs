@@ -14,12 +14,12 @@ extern "C"
 
 #include "esp8266_spiffs.hpp"
 
-ICACHE_FLASH_ATTR flashfs::flashfs()
+ICACHE_FLASH_ATTR Flashfs::Flashfs()
 {
     status = FFS_NOT_INIT;
 }
 
-void ICACHE_FLASH_ATTR flashfs::init(void)
+void ICACHE_FLASH_ATTR Flashfs::init(void)
 {
     // SPIFFS_USE_MAGIC is enabled so following documentation:
     // 1) Call SPIFFS_mount
@@ -91,7 +91,7 @@ void ICACHE_FLASH_ATTR flashfs::init(void)
             return;
         }
     }
-    P_TRACE("[TRACE]: File system mounted.\n");
+    P_INFO("[INFO]: File system mounted.\n");
     status = FFS_AVAILABLE;
     u32_t total = 0;
     u32_t used = 0;
@@ -99,7 +99,7 @@ void ICACHE_FLASH_ATTR flashfs::init(void)
     P_INFO("[INFO]: File system size [bytes]: %d, used [bytes]:%d.\n", total, used);
 }
 
-void ICACHE_FLASH_ATTR flashfs::format(void)
+void ICACHE_FLASH_ATTR Flashfs::format(void)
 {
     if (status == FFS_NOT_INIT)
     {
@@ -123,7 +123,7 @@ void ICACHE_FLASH_ATTR flashfs::format(void)
     }
 }
 
-void ICACHE_FLASH_ATTR flashfs::unmount(void)
+void ICACHE_FLASH_ATTR Flashfs::unmount(void)
 {
     if (status == FFS_NOT_INIT)
     {
@@ -135,12 +135,12 @@ void ICACHE_FLASH_ATTR flashfs::unmount(void)
     status = FFS_UNMOUNTED;
 }
 
-flashfs_status ICACHE_FLASH_ATTR flashfs::get_status()
+flashfs_status ICACHE_FLASH_ATTR Flashfs::get_status()
 {
     return status;
 }
 
-bool ICACHE_FLASH_ATTR flashfs::is_available()
+bool ICACHE_FLASH_ATTR Flashfs::is_available()
 {
     if ((status == FFS_AVAILABLE) || (status == FFS_ERRORS))
         return true;
@@ -148,7 +148,7 @@ bool ICACHE_FLASH_ATTR flashfs::is_available()
         return false;
 }
 
-s32_t ICACHE_FLASH_ATTR flashfs::last_error()
+s32_t ICACHE_FLASH_ATTR Flashfs::last_error()
 {
     if (status == FFS_NOT_INIT)
     {
@@ -158,7 +158,7 @@ s32_t ICACHE_FLASH_ATTR flashfs::last_error()
     return SPIFFS_errno(&m_fs);
 }
 
-u32_t ICACHE_FLASH_ATTR flashfs::get_total_size()
+u32_t ICACHE_FLASH_ATTR Flashfs::get_total_size()
 {
     if (status == FFS_NOT_INIT)
     {
@@ -171,7 +171,7 @@ u32_t ICACHE_FLASH_ATTR flashfs::get_total_size()
     res = SPIFFS_info(&m_fs, &total, &used);
     return total;
 }
-u32_t ICACHE_FLASH_ATTR flashfs::get_used_size()
+u32_t ICACHE_FLASH_ATTR Flashfs::get_used_size()
 {
     if (status == FFS_NOT_INIT)
     {
@@ -185,7 +185,7 @@ u32_t ICACHE_FLASH_ATTR flashfs::get_used_size()
     return used;
 }
 
-s32_t ICACHE_FLASH_ATTR flashfs::check()
+s32_t ICACHE_FLASH_ATTR Flashfs::check()
 {
     if (status == FFS_NOT_INIT)
     {
@@ -206,7 +206,7 @@ s32_t ICACHE_FLASH_ATTR flashfs::check()
     return res;
 }
 
-struct spiffs_dirent ICACHE_FLASH_ATTR *flashfs::list(int t_file)
+struct spiffs_dirent ICACHE_FLASH_ATTR *Flashfs::list(int t_file)
 {
     if (status == FFS_NOT_INIT)
     {
@@ -225,7 +225,7 @@ struct spiffs_dirent ICACHE_FLASH_ATTR *flashfs::list(int t_file)
     return pfile;
 }
 
-spiffs ICACHE_FLASH_ATTR *flashfs::get_handler()
+spiffs ICACHE_FLASH_ATTR *Flashfs::get_handler()
 {
     if (status == FFS_NOT_INIT)
     {
@@ -237,7 +237,7 @@ spiffs ICACHE_FLASH_ATTR *flashfs::get_handler()
 
 // create a new file with no name, no operations will be permitted
 // the file status is set to FFS_F_UNAVAILABLE
-ICACHE_FLASH_ATTR ffile::ffile(flashfs *t_fs)
+ICACHE_FLASH_ATTR Ffile::Ffile(Flashfs *t_fs)
 {
     status = FFS_F_UNAVAILABLE;
     m_name[0] = '\0';
@@ -255,7 +255,7 @@ ICACHE_FLASH_ATTR ffile::ffile(flashfs *t_fs)
 // create a new file variable with the specified name
 // create a new file, or open if it exists, ready for READ and WRITE (APPEND) operations
 // in case of errors the file status is set to FFS_F_UNAVAILABLE
-ICACHE_FLASH_ATTR ffile::ffile(flashfs *t_fs, char *t_filename)
+ICACHE_FLASH_ATTR Ffile::Ffile(Flashfs *t_fs, char *t_filename)
 {
     status = FFS_F_UNAVAILABLE;
     os_strncpy(m_name, t_filename, 30);
@@ -284,7 +284,7 @@ ICACHE_FLASH_ATTR ffile::ffile(flashfs *t_fs, char *t_filename)
 
 // close the file (if open)
 // and eventually flush chache to flash memory
-ICACHE_FLASH_ATTR ffile::~ffile()
+ICACHE_FLASH_ATTR Ffile::~Ffile()
 {
     if (m_fs && (m_fs->is_available()))
     {
@@ -298,7 +298,7 @@ ICACHE_FLASH_ATTR ffile::~ffile()
 }
 
 // return the file name
-char ICACHE_FLASH_ATTR *ffile::get_name()
+char ICACHE_FLASH_ATTR *Ffile::get_name()
 {
     if (os_strlen(m_name) == 0)
     {
@@ -313,7 +313,7 @@ char ICACHE_FLASH_ATTR *ffile::get_name()
 // then
 // create a new file, or open if it exists, ready for READ and WRITE (APPEND) operations
 // in case of errors the file status is set to FFS_F_UNAVAILABLE
-void ICACHE_FLASH_ATTR ffile::open(char *t_filename)
+void ICACHE_FLASH_ATTR Ffile::open(char *t_filename)
 {
     if (m_fs && (m_fs->is_available()))
     {
@@ -346,13 +346,13 @@ void ICACHE_FLASH_ATTR ffile::open(char *t_filename)
 }
 
 // return the file status
-flashfs_file_status ICACHE_FLASH_ATTR ffile::get_status()
+flashfs_file_status ICACHE_FLASH_ATTR Ffile::get_status()
 {
     return status;
 }
 
 // return the file status
-bool ICACHE_FLASH_ATTR ffile::is_available()
+bool ICACHE_FLASH_ATTR Ffile::is_available()
 {
     if ((status == FFS_F_OPEN) || (FFS_F_MODIFIED_UNSAVED))
         return true;
@@ -361,7 +361,7 @@ bool ICACHE_FLASH_ATTR ffile::is_available()
 }
 
 // read t_len bytes from the file to the t_buffer
-int ICACHE_FLASH_ATTR ffile::n_read(char *t_buffer, int t_len)
+int ICACHE_FLASH_ATTR Ffile::n_read(char *t_buffer, int t_len)
 {
     s32_t res = 0;
     if (m_fs && (m_fs->is_available()))
@@ -389,7 +389,7 @@ int ICACHE_FLASH_ATTR ffile::n_read(char *t_buffer, int t_len)
 }
 
 // write (append) t_len bytes from the t_buffer to the file
-int ICACHE_FLASH_ATTR ffile::n_append(char *t_buffer, int t_len)
+int ICACHE_FLASH_ATTR Ffile::n_append(char *t_buffer, int t_len)
 {
     s32_t res = 0;
     if (m_fs && (m_fs->is_available()))
@@ -419,7 +419,7 @@ int ICACHE_FLASH_ATTR ffile::n_append(char *t_buffer, int t_len)
 }
 
 // clear the file content
-void ICACHE_FLASH_ATTR ffile::clear()
+void ICACHE_FLASH_ATTR Ffile::clear()
 {
     if (m_fs && (m_fs->is_available()))
     {
@@ -450,7 +450,7 @@ void ICACHE_FLASH_ATTR ffile::clear()
 }
 
 // remove the file
-void ICACHE_FLASH_ATTR ffile::remove()
+void ICACHE_FLASH_ATTR Ffile::remove()
 {
     if (m_fs && (m_fs->is_available()))
     {
@@ -475,7 +475,7 @@ void ICACHE_FLASH_ATTR ffile::remove()
 }
 
 // flush chached changes to the flash memory
-void ICACHE_FLASH_ATTR ffile::flush_cache()
+void ICACHE_FLASH_ATTR Ffile::flush_cache()
 {
     if (m_fs && (m_fs->is_available()))
     {
@@ -495,4 +495,54 @@ void ICACHE_FLASH_ATTR ffile::flush_cache()
         status = FFS_F_UNAVAILABLE;
         P_ERROR("[ERROR]: flushing cache on a not available file system\n");
     }
+}
+
+bool ICACHE_FLASH_ATTR Ffile::exists(Flashfs *t_fs, char *t_name)
+{
+    spiffs_DIR directory;
+    struct spiffs_dirent tmp_file;
+    struct spiffs_dirent *file_ptr;
+
+    if (t_fs->is_available())
+    {
+        SPIFFS_opendir(t_fs->get_handler(), "/", &directory);
+        while ((file_ptr = SPIFFS_readdir(&directory, &tmp_file)))
+        {
+            if (0 == os_strncmp(t_name, (char *)file_ptr->name, os_strlen(t_name)))
+            {
+                return true;
+            }
+        }
+        SPIFFS_closedir(&directory);
+    }
+    else
+    {
+        P_ERROR("[ERROR]: checking if file exists on not available file system\n");
+    }
+    return false;
+}
+
+int ICACHE_FLASH_ATTR Ffile::size(Flashfs *t_fs, char *t_name)
+{
+    spiffs_DIR directory;
+    struct spiffs_dirent tmp_file;
+    struct spiffs_dirent *file_ptr;
+
+    if (t_fs->is_available())
+    {
+        SPIFFS_opendir(t_fs->get_handler(), "/", &directory);
+        while ((file_ptr = SPIFFS_readdir(&directory, &tmp_file)))
+        {
+            if (0 == os_strncmp(t_name, (char *)file_ptr->name, os_strlen(t_name)))
+            {
+                return file_ptr->size;
+            }
+        }
+        SPIFFS_closedir(&directory);
+    }
+    else
+    {
+        P_ERROR("[ERROR]: checking file size on not available file system\n");
+    }
+    return -1;
 }

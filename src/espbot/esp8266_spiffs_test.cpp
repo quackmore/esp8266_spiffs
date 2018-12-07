@@ -284,7 +284,7 @@ int ICACHE_FLASH_ATTR flash_function_test(void)
     return 0;
 }
 
-void ICACHE_FLASH_ATTR file_ls(flashfs *t_fs)
+void ICACHE_FLASH_ATTR file_ls(Flashfs *t_fs)
 {
     static struct spiffs_dirent ffile;
     struct spiffs_dirent *pfile;
@@ -300,7 +300,7 @@ void ICACHE_FLASH_ATTR file_ls(flashfs *t_fs)
 
 // #pragma GCC diagnostic ignored "-Wwrite-strings"
 
-flashfs fs;
+Flashfs fs;
 
 int ICACHE_FLASH_ATTR flashfs_class_test(void)
 {
@@ -308,7 +308,7 @@ int ICACHE_FLASH_ATTR flashfs_class_test(void)
 
     P_INFO("[INFO]: Test 1 - check that before init the file system is unavailable\n");
     {
-        flashfs fs_not_init;
+        Flashfs fs_not_init;
         P_TRACE("[TRACE]: Trying to format a not initialized FS\n");
         P_WARN("[WARNING]: Visually check the result!!\n");
         fs_not_init.format();
@@ -420,7 +420,7 @@ int ICACHE_FLASH_ATTR ffile_class_test(void)
         {
             file_ls(&fs);
             P_INFO("[INFO]: Test 1 - check that without a filename the file is unavailable\n");
-            ffile cfgfile(&fs);
+            Ffile cfgfile(&fs);
             int res;
             char buffer[128];
             char *str = "test";
@@ -460,7 +460,7 @@ int ICACHE_FLASH_ATTR ffile_class_test(void)
             file_ls(&fs);
             P_INFO("[INFO]: Test 2 - write to file\n");
             P_WARN("[WARNING]: Visually check the result!!\n");
-            ffile cfgfile(&fs, "first_file.txt");
+            Ffile cfgfile(&fs, "first_file.txt");
             char *str = "test";
             if (cfgfile.is_available())
             {
@@ -473,7 +473,7 @@ int ICACHE_FLASH_ATTR ffile_class_test(void)
             file_ls(&fs);
             P_INFO("[INFO]: Test 3 - read from file\n");
             P_WARN("[WARNING]: Visually check the result!!\n");
-            ffile cfgfile(&fs, "first_file.txt");
+            Ffile cfgfile(&fs, "first_file.txt");
             char buffer[128];
             os_memset(buffer, 'X', 128);
             if (cfgfile.is_available())
@@ -498,7 +498,7 @@ int ICACHE_FLASH_ATTR ffile_class_test(void)
             file_ls(&fs);
             P_INFO("[INFO]: Test 4 - clear file\n");
             P_WARN("[WARNING]: Visually check the result!!\n");
-            ffile cfgfile(&fs, "first_file.txt");
+            Ffile cfgfile(&fs, "first_file.txt");
             char buffer[128];
             os_memset(buffer, 'X', 128);
             P_TRACE("[TRACE]: clearing file, check the file size\n");
@@ -528,7 +528,7 @@ int ICACHE_FLASH_ATTR ffile_class_test(void)
             file_ls(&fs);
             P_INFO("[INFO]: Test 5 - flushing file cache\n");
             P_WARN("[WARNING]: Visually check the result!!\n");
-            ffile cfgfile(&fs, "first_file.txt");
+            Ffile cfgfile(&fs, "first_file.txt");
             char *str = "test";
             if (cfgfile.is_available())
             {
@@ -542,7 +542,7 @@ int ICACHE_FLASH_ATTR ffile_class_test(void)
             file_ls(&fs);
             P_INFO("[INFO]: Test 6 - delete file\n");
             P_WARN("[WARNING]: Visually check the result!!\n");
-            ffile cfgfile(&fs, "first_file.txt");
+            Ffile cfgfile(&fs, "first_file.txt");
             P_TRACE("[TRACE]: deleting file\n");
             if (cfgfile.is_available())
                 cfgfile.remove();
@@ -554,7 +554,7 @@ int ICACHE_FLASH_ATTR ffile_class_test(void)
             file_ls(&fs);
             P_INFO("[INFO]: Test 7 - creating a file with filename longer that 30 characters\n");
             P_WARN("[WARNING]: Visually check the result!!\n");
-            ffile cfgfile(&fs, "aAaAaAaA10aAaAaAaA20aAaAaAaA30.txt");
+            Ffile cfgfile(&fs, "aAaAaAaA10aAaAaAaA20aAaAaAaA30.txt");
             file_ls(&fs);
             P_INFO("[INFO]: Test 7 completed\n");
         }
@@ -562,7 +562,7 @@ int ICACHE_FLASH_ATTR ffile_class_test(void)
             file_ls(&fs);
             P_INFO("[INFO]: Test 8 - remove previously created file\n");
             P_WARN("[WARNING]: Visually check the result!!\n");
-            ffile cfgfile(&fs);
+            Ffile cfgfile(&fs);
             if (cfgfile.is_available())
             {
                 cfgfile.open("aAaAaAaA10aAaAaAaA20aAaAaAaA30");
